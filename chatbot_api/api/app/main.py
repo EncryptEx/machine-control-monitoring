@@ -3,32 +3,45 @@ from fastapi.responses import JSONResponse
 import uvicorn
 import json
 
+from llm import LLM
+
 app = FastAPI()
 
 
-# Serve the HTML page
+from fastapi.middleware.cors import CORSMiddleware
+origins = ["http://localhost:3000", None, "null"]  
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+
 @app.get("/")
 def root():
-    return {"hi"}
+    return {"its working!"}
 
 
-# Endpoint to receive the POST request
-@app.post("/send")
+
+@app.post("/chatbot")
 async def send_info(request: Request):
-    data = await request.json()
-    user_text = data.get("user_input")
-
+    
+    data = await request.json()                                                                                                                                                                                                                                                                                                                                 
+    question = data.get("user_input")
     info_sensors = data.get("sensors_info")
     
-    # query to llama
+    llm = LLM()
+    response, action = llm.ask(question, info_sensors) 
 
-    # Prepare a JSON response to be sent back
-    response_data = {
-        "original_text": user_text,
-        "original_sensors": info_sensors
-    }
-
-    return response_data
+    ret = {"answer": response}
+    if action:
+        ret["action"] = action
+    
+    return ret
 
 
 if __name__ == "__main__":
