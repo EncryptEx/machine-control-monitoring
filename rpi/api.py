@@ -53,7 +53,6 @@ p = GPIO.PWM(servoPIN, 50)
 areMotorsEnabled = False
 servoSpeed = 0
 theorical_velocity = 0.0
-practicVelocity = 0.0
 periodBetweenBoxes = 0.0
 totalBoxesCount = 0
 
@@ -214,61 +213,51 @@ def normalize_to_duty_cycle(value: float) -> float:
     
     return duty_cycle
 
+# @app.get("/read/ir")
 def compute_velocity():
     global theorical_velocity, DEBOUNCE_DELAY, periodBetweenBoxes, totalBoxesCount
+    lastTime = time.time()
+    sspeed = 0
+    waiting_for_rise = True
     while True:
-        start, end = None, None
-        waiting_for_rise = True  # Start by waiting for a rising edge
+        ir_state = GPIO.input(IR_LED)
+        currentTime = time.time()
+        delta = currentTime - lastTime
+        if waiting_for_rise and ir_state == 1:  # Rising edge detected
+            time.sleep(DEBOUNCE_DELAY)  # Wait for debounce delay
+            if GPIO.input(IR_LED) == 1:  # Verify signal stability
+                waiting_for_rise = False  # Now wait for the falling edge
+                # RAISING EDGE
+                #Count boxes
+                logger.debug("Box detected")
+                totalBoxesCount += 1
 
-        
+                #Calc velocity
 
-        while end is None:  # Keep running until we get two edges
-            ir_state = GPIO.input(IR_LED)
+                if lastTime != None:
+                    periodBetweenBoxes = delta
+                    theorical_velocity = 0.073 / float(delta)
+                else:
+                    theorical_velocity = -1
 
-            if waiting_for_rise and ir_state == 1:  # Rising edge detected
-                time.sleep(DEBOUNCE_DELAY)  # Wait for debounce delay
-                if GPIO.input(IR_LED) == 1:  # Verify signal stability
-                    totalBoxesCount += 1
-                    if start is None:  # First rising edge
-                        start = time.perf_counter()
-                        waiting_for_rise = False  # Now wait for the falling edge
-                    elif start is not None:  # Second rising edge
-                        end = time.perf_counter()
+                lastTime = currentTime
+        # logger.debug(f"IR state: {ir_state}, waiting_for_rise: {waiting_for_rise}, delta: {delta}")
+        if not waiting_for_rise and ir_state == 0:  # Falling edge detected
+            waiting_for_rise = True  # Now wait for the next rising edge
+            sspeed = abs(servoSpeed)
 
-            elif not waiting_for_rise and ir_state == 0:  # Falling edge detected
-                time.sleep(DEBOUNCE_DELAY)  # Wait for debounce delay
-                if GPIO.input(IR_LED) == 0:  # Verify signal stability
-                    waiting_for_rise = True  # Now wait for the next rising edge
+        #v1 = 13
+        #v2 = 9
+        #v3 = 6
+        #v4 = 4.5
+        #v5 = 4.2
+        velRef = [0, 13, 9, 6, 4.5, 4.2]
 
-        # Calculate velocity
-        if start is not None and end is not None:
-            duration = end - start
-            if duration > 0:  # Ensure valid duration
-                theorical_velocity = 0.073 / duration  # m/s
-                periodBetweenBoxes = duration
-            else:
-                theorical_velocity = -1    
-        else:
-            theorical_velocity = -1    
-    
-def count_rising_edges(duration: int):
-    global practicVelocity
-    while(True):
-        count = 0
-        start_time = time.time()
-        # add "duration" seconds to the current time
-        end_time = start_time + duration
-        while time.time() < end_time:
-            if GPIO.input(IR_LED) == 1:
-                time.sleep(DEBOUNCE_DELAY)
-                if GPIO.input(IR_LED) == 1:
-                    count += 1
-                    while GPIO.input(IR_LED) == 1:
-                        time.sleep(DEBOUNCE_DELAY)
-        deltaTime = time.time() - start_time # = duration
-        practicVelocity = 1000* count * 0.073 / deltaTime
-        print(f"Rising edges counted in {duration} seconds: {count} resulted into a practical velocity of {practicVelocity} mm/s")
-        time.sleep(1)
+        if (sspeed > 0.001 and delta > 1.5*velRef[int(sspeed)]):
+            #too much time has passed, 
+            theorical_velocity = 0
+        if(sspeed == 0): theorical_velocity = 0
+
 
 # Start the frequency computation in a separate thread
 frequency_thread = threading.Thread(target=compute_velocity)
@@ -279,10 +268,6 @@ iot = threading.Thread(target=send_telemetry)
 iot.daemon = True
 iot.start()
 
-# Start the rising edge counting in a separate thread
-rising_edge_thread = threading.Thread(target=count_rising_edges, args=(5,))
-rising_edge_thread.daemon = True
-rising_edge_thread.start()
 
 def check_killswitch():
     while True:
@@ -361,7 +346,6 @@ def read():
         'normalizedServoSpeed': servoSpeed,
         'realServoDutyCycle': normalize_to_duty_cycle(servoSpeed),
         'realVelocity': theorical_velocity,
-        'practicVelocity': practicVelocity,
         'totalBoxesCount': totalBoxesCount,
         'periodBetweenBoxes': periodBetweenBoxes,
         'absoluteServoVelocity': abs(servoSpeed),
