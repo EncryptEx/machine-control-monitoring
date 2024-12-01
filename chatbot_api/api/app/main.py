@@ -19,31 +19,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-
-@app.get("/")
-def root():
-    return {"its working!"}
-
-
-
 @app.post("/chatbot")
 async def send_info(request: Request):
+    try:
+        data = await request.json()      
+        question = data.get("user_input")
+        print(question)
+        info_sensors = data.get("sensors_info")
+        print(info_sensors)
+        llm = LLM()
+        response, action, parameter = llm.ask(question, info_sensors) 
 
-    data = await request.json()                                                                                                                                                                                                                                                                                                                                 
-    question = data.get("user_input")
-    info_sensors = data.get("sensors_info")
-    
-    llm = LLM()
-    response, action, parameter = llm.ask(question, info_sensors) 
-
-    ret = {"answer": response}
-    if action:
-        ret["action"] = action
-        if parameter:
-            ret["parameter"] = parameter
-            
-    return ret
+        ret = {"answer": response}
+        if action:
+            ret["action"] = action
+            if parameter:
+                ret["parameter"] = parameter
+        print(ret)
+        return ret
+    except:
+        return {"answer": "Bob is not available at the moment"}
 
 if __name__ == "__main__":
     uvicorn.run(app, port=8000, host="0.0.0.0")
