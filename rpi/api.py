@@ -4,7 +4,9 @@ import logging
 from fastapi import FastAPI
 import RPi.GPIO as GPIO
 
+
 app = FastAPI()
+
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -18,6 +20,8 @@ app.version = "0.1.0"
 # GPIO Setup
 servoPIN = 17
 IR_LED = 14
+DEBOUNCE_DELAY = 0.01
+
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(servoPIN, GPIO.OUT)
 GPIO.setup(IR_LED, GPIO.IN)
@@ -26,7 +30,9 @@ p = GPIO.PWM(servoPIN, 50)
 areMotorsEnabled = False
 servoSpeed = 0
 realvelocity_value = 0.0
+periodBetweenBoxes = 0.0
 totalBoxesCount = 0
+
 
 # Helper function to normalize values
 def normalize_to_duty_cycle(value: float) -> float:
@@ -46,27 +52,38 @@ def normalize_to_duty_cycle(value: float) -> float:
     return duty_cycle
 
 def compute_velocity():
-    # calc time between two rising edges of IR 
-    global realvelocity_value
-    # wait for a rising edge
-    while GPIO.input(IR_LED) == 1:
-        pass
-    time.sleep(0.01)  # Add a small debounce delay
-    while GPIO.input(IR_LED) == 0:
-        pass
-    start = time.perf_counter()
-    while GPIO.input(IR_LED) == 1:
-        pass
-    time.sleep(0.01)  # Add a small debounce delay
-    while GPIO.input(IR_LED) == 0:
-        pass
-    
-    end = time.perf_counter()
-    # calc velocity knowing that 73mm / time = velocity
-    realvelocity_value = 0.073 / (end - start) # m/s
-    time.sleep(0.1)
-    
-    
+    global realvelocity_value, DEBOUNCE_DELAY, periodBetweenBoxes, totalBoxesCount
+    while True:
+        start, end = None, None
+        waiting_for_rise = True  # Start by waiting for a rising edge
+
+        while end is None:  # Keep running until we get two edges
+            ir_state = GPIO.input(IR_LED)
+
+            if waiting_for_rise and ir_state == 1:  # Rising edge detected
+                time.sleep(DEBOUNCE_DELAY)  # Wait for debounce delay
+                if GPIO.input(IR_LED) == 1:  # Verify signal stability
+                    if start is None:  # First rising edge
+                        start = time.perf_counter()
+                        waiting_for_rise = False  # Now wait for the falling edge
+                    elif start is not None:  # Second rising edge
+                        end = time.perf_counter()
+
+            elif not waiting_for_rise and ir_state == 0:  # Falling edge detected
+                time.sleep(DEBOUNCE_DELAY)  # Wait for debounce delay
+                if GPIO.input(IR_LED) == 0:  # Verify signal stability
+                    waiting_for_rise = True  # Now wait for the next rising edge
+
+        # Calculate velocity
+        if start is not None and end is not None:
+            duration = end - start
+            if duration > 0:  # Ensure valid duration
+                realvelocity_value = 0.073 / duration  # m/s
+                periodBetweenBoxes = duration
+            else:
+                realvelocity_value = -1    
+        else:
+            realvelocity_value = -1    
     
     
 
@@ -74,6 +91,10 @@ def compute_velocity():
 frequency_thread = threading.Thread(target=compute_velocity)
 frequency_thread.daemon = True
 frequency_thread.start()
+
+# iot = threading.Thread(target=send_telemetry)
+# iot.daemon = True
+# iot.start()
 
 @app.get("/helloworld")
 def helloworld():
@@ -143,6 +164,7 @@ def read():
         'realServoDutyCycle': normalize_to_duty_cycle(servoSpeed),
         'realVelocity': realvelocity_value,
         'totalBoxesCount': totalBoxesCount,
+        'periodBetweenBoxes': periodBetweenBoxes,
         'timestamp': (int)(time.time())
     }
 
@@ -151,4 +173,4 @@ def read():
 # compute frequency between 1 rising edge and 1 falling edge
 @app.get("/velocity")
 def get_velocity():
-    return {"velocity": realvelocity_value}
+    return {"velocity": realvelocity_value, 'velocitymms': realvelocity_value * 1000}
