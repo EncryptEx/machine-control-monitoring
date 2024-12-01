@@ -29,20 +29,21 @@ def root():
 
 @app.post("/chatbot")
 async def send_info(request: Request):
-    
+
     data = await request.json()                                                                                                                                                                                                                                                                                                                                 
     question = data.get("user_input")
     info_sensors = data.get("sensors_info")
     
     llm = LLM()
-    response, action = llm.ask(question, info_sensors) 
+    response, action, parameter = llm.ask(question, info_sensors) 
 
     ret = {"answer": response}
     if action:
         ret["action"] = action
-    
+        if parameter:
+            ret["parameter"] = parameter
+            
     return ret
-
 
 if __name__ == "__main__":
     uvicorn.run(app, port=8000, host="0.0.0.0")

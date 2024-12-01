@@ -92,6 +92,7 @@
         <div id="response">
             <div class="answer"></div>
             <div class="action"></div>
+            <div class="parameter"></div>
         </div>
     </form>
 
@@ -122,6 +123,7 @@
                     responseElement.innerHTML = `
                         <div class="answer"><strong>Answer:</strong> ${result.answer || "N/A"}</div>
                         <div class="action"><strong>Action:</strong> ${result.action || "N/A"}</div>
+                        <div class="parameter"><strong>Parameter:</strong> ${result.parameter || "N/A"}</div>
                     `;
                 } else {
                     responseElement.innerHTML = `
