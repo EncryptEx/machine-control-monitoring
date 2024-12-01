@@ -34,8 +34,14 @@ app.version = "0.1.0"
 servoPIN = 17
 IR_LED = 14
 DEBOUNCE_DELAY = 0.01
+TRIG_PIN = 23  # GPIO pin connected to the TRIG pin of the sensor
+ECHO_PIN = 24  # GPIO pin connected to the ECHO pin of the sensor
+KILLSWITCH_THRESHOLD_CM = 8
 
 GPIO.setmode(GPIO.BCM)
+GPIO.setup(TRIG_PIN, GPIO.OUT)
+GPIO.setup(ECHO_PIN, GPIO.IN)
+GPIO.output(TRIG_PIN, False)
 GPIO.setup(servoPIN, GPIO.OUT)
 GPIO.setup(IR_LED, GPIO.IN)
 
@@ -59,6 +65,29 @@ ina.configure(voltage_range=ina.RANGE_16V,
               bus_adc=ina.ADC_128SAMP,
               shunt_adc=ina.ADC_128SAMP)
 
+
+def get_distance():
+    """Calculate and return the distance measured by the ultrasonic sensor."""
+    # Trigger a pulse
+    GPIO.output(TRIG_PIN, True)
+    time.sleep(0.00001)  # 10 microseconds pulse
+    GPIO.output(TRIG_PIN, False)
+
+    # Wait for the echo to start
+    while GPIO.input(ECHO_PIN) == 0:
+        pulse_start = time.time()
+
+    # Wait for the echo to stop
+    while GPIO.input(ECHO_PIN) == 1:
+        pulse_end = time.time()
+
+    # Calculate pulse duration
+    pulse_duration = pulse_end - pulse_start
+
+    # Calculate distance (speed of sound is 34300 cm/s)
+    distance = pulse_duration * 34300 / 2  # Divide by 2 for the round trip
+
+    return round(distance, 2)
 
 def get_voltage():
     return ina.voltage()
@@ -144,6 +173,8 @@ def compute_velocity():
         start, end = None, None
         waiting_for_rise = True  # Start by waiting for a rising edge
 
+        
+
         while end is None:  # Keep running until we get two edges
             ir_state = GPIO.input(IR_LED)
 
@@ -205,6 +236,20 @@ iot.start()
 rising_edge_thread = threading.Thread(target=count_rising_edges, args=(5,))
 rising_edge_thread.daemon = True
 rising_edge_thread.start()
+
+def check_killswitch():
+    while True:
+        distance = get_distance()
+        if distance < KILLSWITCH_THRESHOLD_CM:
+            disable_motors()
+            print("Killswitch activated! Motors disabled.")
+        time.sleep(0.5)
+
+# Start the killswitch checking in a separate thread
+killswitch_thread = threading.Thread(target=check_killswitch)
+killswitch_thread.daemon = True
+killswitch_thread.start()
+
 
 @app.get("/helloworld")
 def helloworld():
