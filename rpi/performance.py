@@ -32,7 +32,7 @@ def create_machine_event(event_type, job_id, job_output_count, total_output_coun
 def send_message_to_iot_hub(event_data):
     try:
         # Convert the dictionary to a JSON string
-        json_data = json.dumps(event_data)
+        json_data = json.dumps([event_data])
 
         # Create a message with the JSON data
         machine_event_message = Message(json_data)
