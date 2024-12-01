@@ -26,7 +26,6 @@ This project is the implementation of the **Bobst Company challenge** presented 
 **Key Features**:  
 - **3D-Printed Conveyor Belt** controlled by a Raspberry Pi.  
 - Real-time data collection (speed, box counter, energy usage).  
-- Integration with **Azure IoT Hub** for seamless monitoring.  
 - AI-powered chatbot for troubleshooting and monitoring via **Ollama's Llama 3.2**.  
 - Interactive HMI built in **Unity** for real-time control and visualization.  
 - Dockerized architecture for easy deployment.
@@ -114,15 +113,15 @@ git clone git@github.com:EncryptEx/machine-control-monitoring.git
 cd machine-control-monitoring
 ```
 
-2. Build and run Dockers containers:
+2. Build and run Dockers containers: (form the `chatbot_api` folder)
 ```bash
 docker-compose up --build
 ```
 
-3. Launch Unity Application:
+3. Launch Unity Application:<br>
 Open the Unity project in your IDE and run the scene.
 
-4. Interact with Bob:
+4. Interact with Bob:<br>
 Use the chatbot interface in Unity to troubleshoot and control the conveyor.
 
 
