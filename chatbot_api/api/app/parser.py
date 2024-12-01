@@ -25,18 +25,19 @@ def parse_response(response):
     return user_response, None, None
 
 def parse_info_sensors(data):
-    
-    parsed_data = {
-        "Motor Status": f"{'Running' if data['isServoRunning'] else 'Not Running'}",
-        "Real Velocity (m/s)": round(data['realVelocity'], 2),
-        "Practical Velocity (m/s)": round(data['practicVelocity'], 2),
-        "Total number of boxes passed": data['totalBoxesCount'],
-        "Speed": round(data['absoluteServoVelocity'], 2),
-        "Servo Direction": "f Forward" if data['isForward'] == 'f' else "b Backward",
-        "Voltage (V)": round(data['voltage'], 2),
-        "Current (mA)": round(data['current'], 2),
-        "Power (mW)": round(data['power'], 2),
-    }
-    print(parsed_data)
-    return parsed_data
+    try:
+        parsed_data = {
+            "Motor Status": f"{'Running' if data['isServoRunning'] else 'Not Running'}",
+            "Velocity (m/s)": round(data['realVelocity'], 2),
+            "Total number of boxes passed": data['totalBoxesCount'],
+            "Speed": round(data['absoluteServoVelocity'], 2),
+            "Servo Direction": "f Forward" if data['isForward'] == 'f' else "b Backward",
+            "Voltage (V)": round(data['voltage'], 2),
+            "Current (mA)": round(data['current'], 2),
+            "Power (mW)": round(data['power'], 2),
+        }
+        print(parsed_data)
+        return parsed_data
 
+    except:
+        return data

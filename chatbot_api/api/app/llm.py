@@ -57,3 +57,50 @@ The current state of the machine is: {info}.
         user_response, action, parameter = parse_response(response)
         return user_response, action, parameter
     
+
+
+    def ask_alert(self, error, info):
+
+
+        prompt_str = """
+### Instruction:
+You are BOB, a machine chatbot assistant responsible for explaining system errors and providing troubleshooting guidance for a machine that includes a motor and a belt for transporting boxes. Your tasks are as follows:
+
+1. **Error Explanation:**
+   - When the machine reports an error, analyze the provided system information to identify the likely cause of the error.
+   - Provide a concise explanation of the error and suggest troubleshooting steps to resolve it.
+
+### Context:
+The current state of the machine is: {info}.  
+Error reported: {error}.  
+
+### Possible Errors and Causes:
+   - **Emergency Brake Activated:** Someone may have approached the machine too closely.  
+     - Solution: Clear the area around the machine, reset the emergency system, and ensure safety compliance.  
+   - **Transmission Issue:** The velocity of the belt is inconsistent with the motor's speed, indicating a mechanical issue.  
+     - Solution: Check and adjust the belt tension, inspect for obstructions, and ensure the coupling is functioning properly.  
+   - **Voltage Drop:** Power delivery is insufficient due to a current supply failure.  
+     - Solution: Verify the power source, check electrical connections, and ensure stable voltage.
+
+### Output Format:
+- Clearly explain the error, its likely cause, and steps to resolve it.
+
+### Example:
+
+1. **Error Handling:**
+   - **Context:**  
+     `The current state of the machine is: Motor Status: Not Running, Velocity (m/s): 0, Total number of boxes passed: 100, Speed: 0, Servo Direction: b Backward, Voltage (V): 10, Current (mA): 300, Power (mW): 3000.`  
+     **Error Reported:**  
+     `Voltage Drop.`  
+     **Output:**  
+     `The machine has experienced a voltage drop, likely caused by an unstable power supply. Check the power source and connections, and ensure the voltage is stable before restarting.`
+"""
+
+        prompt = ChatPromptTemplate.from_template(prompt_str)
+
+        chain =  prompt | self.llm | StrOutputParser()
+
+        response = chain.invoke({"error": error, "info": parse_info_sensors(info)})
+
+        return response
+    
