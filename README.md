@@ -102,16 +102,28 @@ API for talking to the Raspberry Pi 5:
 
 
 
-
-<br><br>
+<br>
 
 ---
 
-### Clone the Repository:  
+### Setup instructions
+
+1. Clone the Repository:  
 ```bash
-git clone https://github.com/yourusername/lauzhack24.git
-cd lauzhack24
+git clone git@github.com:EncryptEx/machine-control-monitoring.git
+cd machine-control-monitoring
 ```
+
+2. Build and run Dockers containers:
+```bash
+docker-compose up --build
+```
+
+3. Launch Unity Application:
+Open the Unity project in your IDE and run the scene.
+
+4. Interact with Bob:
+Use the chatbot interface in Unity to troubleshoot and control the conveyor.
 
 
 <br><br>
