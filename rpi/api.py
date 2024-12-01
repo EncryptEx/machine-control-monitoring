@@ -109,15 +109,15 @@ async def startup_event():
         
 
 def throw_erno_glbl(errn):
-    global errno_glbl, timeProducting
+    global errno_glbl, timeProducting, deltaBox
     if(errno_glbl != 0): return
     errno_glbl = errn
     if(timeProducting == 0): timeProducting = time.time()
     old = timeProducting
     deltaTime = time.time() - old
+    disable_motors()
     send_message_to_iot_hub(create_machine_event("stopProducing", "BobMachine", deltaBox, totalBoxesCount, deltaTime, datetime.datetime.now(datetime.timezone.utc)))
     deltaBox = 0
-    disable_motors()
     logger.error(f"[ERRNO] Error {errn} occured, motors disabled")
 
 def get_distance():
@@ -363,7 +363,7 @@ def enable_motors(value: float):
     0: Stopped
     5: Full forward
     """
-    global p, areMotorsEnabled, servoSpeed, errno_glbl, start_motor_time, timeProducting
+    global p, areMotorsEnabled, servoSpeed, errno_glbl, start_motor_time, timeProducting, deltaBox
     if(errno_glbl != 0): return {'success': False, 'message': f'Machine unarmed! Error {errno_glbl}. Send /motors/rearm to rearm.'}
     if value < -5 or value > 5:
         return {'success': False, 'message': 'Value must be between -5 and 5'}
@@ -420,7 +420,7 @@ def read():
         'isServoRunning': areMotorsEnabled,
         'normalizedServoSpeed': servoSpeed,
         'realServoDutyCycle': normalize_to_duty_cycle(servoSpeed),
-        'realVelocity': real_velocity,
+        'realVelocity': real_velocity if servoSpeed != 0 else 0,
         'errno': errno_glbl,
         'totalBoxesCount': totalBoxesCount,
         'periodBetweenBoxes': periodBetweenBoxes,
