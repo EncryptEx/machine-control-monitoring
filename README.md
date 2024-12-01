@@ -61,6 +61,9 @@ This project is the implementation of the **Bobst Company challenge** presented 
 Conveyor belt machine:
 ![IMG_20241201_052245](https://github.com/user-attachments/assets/67cafee9-7007-4c13-ad16-447935e2a4e8)
 
+Unity interface:
+![Captura de pantalla 2024-12-01 053224](https://github.com/user-attachments/assets/4420ee48-a3d1-4933-90aa-e8e651c81920)
+
 
 API for talking to the Raspberry Pi 5:
 ![Screenshot from 2024-12-01 04-36-22](https://github.com/user-attachments/assets/71442875-a2fd-4d2d-a9a7-f798587fd7a7)
