@@ -48,6 +48,8 @@ public class MovementController : MonoBehaviour
 
     void Update()
     {
+        if (GlobalConstraints.current.ChatOpen) return;
+
         RotateCamera();
         CameraZoom();
     }

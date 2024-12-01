@@ -6,12 +6,20 @@ using UnityEngine.UI;
 
 public class EngineControl : MonoBehaviour
 {
-    [SerializeField]
-    CustomToggle powerToggle, reverseToggle;
-    [SerializeField]
-    Slider velocitySlider;
+    public static EngineControl current;
 
-    float velocity = 0;
+    private void Awake()
+    {
+        if (current != null) Destroy(this);
+        else current = this;
+    }
+
+    [SerializeField]
+    public CustomToggle powerToggle, reverseToggle;
+    [SerializeField]
+    public Slider velocitySlider;
+
+    public float velocity = 0;
     bool reversed = false;
     bool powered = false;
 
@@ -57,15 +65,11 @@ public class EngineControl : MonoBehaviour
 
         float vel = reversed ? -velocity : velocity;
         string ret = await Networking.SendGetRequest(Requests.changeVelocity, vel.ToString());
-
-        print(ret);
     }
 
     async void SendPowerOff()
     {
         string ret = await Networking.SendGetRequest(Requests.powerOff);
-
-        print(ret);
     }
 
     void OnFirstData(DataReciever.Data data)

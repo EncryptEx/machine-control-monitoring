@@ -25,7 +25,6 @@ public class VisualMovements : MonoBehaviour
     void UpdateValues()
     {
         transmissionRotator.SetSpeed(engineVel);
-        print(engineVel);
     }
 
     void OnDataRecieved(DataReciever.Data data)

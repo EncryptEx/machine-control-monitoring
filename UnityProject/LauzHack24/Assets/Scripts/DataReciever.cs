@@ -18,6 +18,7 @@ public class DataReciever : MonoBehaviour
     }
 
     public Data lastData;
+    public string lastJsonData;
 
     private void Awake()
     {
@@ -49,6 +50,7 @@ public class DataReciever : MonoBehaviour
     async void GetData()
     {
         string ret = await Networking.SendGetRequest(Requests.readall);
+        lastJsonData = ret;
         lastData = JsonUtility.FromJson<Data>(ret);
         OnDataRecieved?.Invoke(lastData);
     }
