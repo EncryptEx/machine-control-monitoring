@@ -34,8 +34,8 @@ def parse_info_sensors(data):
             "Speed (from 0 to 5)": round(data['absoluteServoVelocity'], 2),
             "Servo Direction": "f Forward" if data['isForward'] == 'f' else "b Backward",
             "Voltage (V)": round(data['voltage'], 2),
-            "Current (mA)": round(data['current'], 2),
-            "Power (mW)": round(data['power'], 2),
+            "Current (A)": round(data['current'], 2),
+            "Power (W)": round(data['power'], 2),
         }
         print(parsed_data)
         return parsed_data
