@@ -1,4 +1,4 @@
-# LauzHack24
+# Machine Control & Monitoring with Unity and AI Chatbot
 
 <img src="https://lauzhack.com/images/logo.svg" alt="logo" width="500"/>
 
@@ -26,11 +26,10 @@ This project is the implementation of the **Bobst Company challenge** presented 
 **Key Features**:  
 - **3D-Printed Conveyor Belt** controlled by a Raspberry Pi.  
 - Real-time data collection (speed, box counter, energy usage).  
-- Integration with **Azure IoT Hub** for seamless monitoring.  
 - AI-powered chatbot for troubleshooting and monitoring via **Ollama's Llama 3.2**.  
 - Interactive HMI built in **Unity** for real-time control and visualization.  
 - Dockerized architecture for easy deployment.
-- Bridge between Unity and Ollama with FastAPI
+- Bridge between Unity and Ollama with FastAPI.
 
 
 ---
@@ -41,9 +40,8 @@ This project is the implementation of the **Bobst Company challenge** presented 
 |----------------------|-------------------|-----------------------------------------------|
 | **Hardware**         | Raspberry Pi      | Controls conveyor belt and collects metrics. |
 | **Modeling**         | Unity             | Creates a 3D visualization of the machine.   |
-| **API Layer**        | FastAPI           | Communication between Unity and AI.          |
-| **AI**               | Ollama (Llama 3.2)| Context-aware troubleshooting chatbot.       |
-| **IoT**              | Azure IoT Hub     | Centralized data collection and monitoring.  |
+| **API Layer**        | FastAPI           | Communication between AI and Unity and Unity to Raspberry Pi.  |
+| **AI**               | Ollama (Llama 3.2)| Context-aware troubleshooting LLM chatbot.   |
 | **Deployment**       | Docker            | Simplified deployment of all components.     |
 
 ---
@@ -84,7 +82,8 @@ Meet **Bob**, our AI-powered assistant built on **Ollama's Llama 3.2**. Bob is i
 ### Screenshots
 
 Conveyor belt machine:
-![IMG_20241201_052245](https://github.com/user-attachments/assets/67cafee9-7007-4c13-ad16-447935e2a4e8)
+![IMG20241201111510](https://github.com/user-attachments/assets/a1c6302c-2a39-4ec9-8342-4851ba1c60b9)
+
 
 The machine operates with a safety feature that performs a secure stop to prevent accidents when a hand is detected near the belt:
 
@@ -114,15 +113,15 @@ git clone git@github.com:EncryptEx/machine-control-monitoring.git
 cd machine-control-monitoring
 ```
 
-2. Build and run Dockers containers:
+2. Build and run Dockers containers: (form the `chatbot_api` folder)
 ```bash
 docker-compose up --build
 ```
 
-3. Launch Unity Application:
+3. Launch Unity Application:<br>
 Open the Unity project in your IDE and run the scene.
 
-4. Interact with Bob:
+4. Interact with Bob:<br>
 Use the chatbot interface in Unity to troubleshoot and control the conveyor.
 
 

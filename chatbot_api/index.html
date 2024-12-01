@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Post Request Form</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #dataForm {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+            width: 600px;
+        }
+
+        h1 {
+            font-size: 2em;
+            text-align: center;
+            color: #333;
+        }
+
+        label {
+            font-size: 1.4em;
+            color: #555;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            margin: 15px 0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1.2em;
+            resize: vertical;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.2em;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button:active {
+            background-color: #004085;
+        }
+
+        #response {
+            margin-top: 30px;
+            font-size: 1.2em;
+            color: #333;
+        }
+
+        #response .answer,
+        #response .action {
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <form id="dataForm">
+        <h1>Submit Your Info</h1>
+        <label for="user_info">Question:</label>
+        <input type="text" id="user_info" name="user_info" required>
+
+        <label for="sensors_info">Sensors Info:</label>
+        <input type="text" id="sensors_info" name="sensors_info" required>
+
+        <button type="button" onclick="sendData()">Submit</button>
+
+        <div id="response">
+            <div class="answer"></div>
+            <div class="action"></div>
+            <div class="parameter"></div>
+        </div>
+    </form>
+
+    <script>
+        async function sendData() {
+            const userInfo = document.getElementById("user_info").value;
+            const sensorsInfo = document.getElementById("sensors_info").value;
+
+            const data = {
+                user_input: userInfo,
+                sensors_info: sensorsInfo
+            };
+
+            const responseElement = document.getElementById("response");
+            responseElement.innerHTML = ""; // Clear previous responses
+
+            try {
+                const response = await fetch("http://localhost:8000/chatbot", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    responseElement.innerHTML = `
+                        <div class="answer"><strong>Answer:</strong> ${result.answer || "N/A"}</div>
+                        <div class="action"><strong>Action:</strong> ${result.action || "N/A"}</div>
+                        <div class="parameter"><strong>Parameter:</strong> ${result.parameter || "N/A"}</div>
+                    `;
+                } else {
+                    responseElement.innerHTML = `
+                        <div class="answer"><strong>Error:</strong> ${response.statusText}</div>
+                        <div class="action"><strong>Status Code:</strong> ${response.status}</div>
+                    `;
+                }
+            } catch (error) {
+                responseElement.innerHTML = `
+                    <div class="answer"><strong>Error:</strong> ${error.message}</div>
+                    <div class="action"><strong>Action:</strong> Request failed</div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

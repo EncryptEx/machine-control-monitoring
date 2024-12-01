@@ -72,4 +72,10 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
 
+
+**/venv
+
+**/__pycache__
+
 rpi/.env
+
