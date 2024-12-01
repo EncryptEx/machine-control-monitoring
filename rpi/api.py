@@ -2,10 +2,10 @@ import threading
 import time
 import json
 import datetime
-import time
 import logging
 from fastapi import FastAPI
 import RPi.GPIO as GPIO
+from ina219 import INA219
 
 
 app = FastAPI()
@@ -46,6 +46,28 @@ periodBetweenBoxes = 0.0
 totalBoxesCount = 0
 
 
+
+ina = INA219(shunt_ohms=0.1,
+             max_expected_amps=0.6,
+             address=0x40,
+             busnum=1)  # Specify the I2C bus number
+
+ina.configure(voltage_range=ina.RANGE_16V,
+              gain=ina.GAIN_AUTO,
+              bus_adc=ina.ADC_128SAMP,
+              shunt_adc=ina.ADC_128SAMP)
+
+
+def get_voltage():
+    return ina.voltage()
+
+def get_current():
+    return ina.current()
+
+def get_power():
+    return ina.power()
+
+
 def send_telemetry():
     global areMotorsEnabled, servoSpeed, realvelocity_value, periodBetweenBoxes, totalBoxesCount
 
@@ -58,8 +80,8 @@ def send_telemetry():
             # Simulate machine speed (1 to 5 boxes per 10 seconds)
             # machine_speed = random.randint(1, 5)
                         
-            # TODO!!!
-            energy_used = 1 * 0.05  # Example: 0.05 kWh per box
+            
+            energy_used = get_power() / 1000 # W
             total_working_energy += energy_used
 
             # Create telemetry data with the current UTC timestamp
@@ -212,10 +234,6 @@ def disable_motors():
     else:
         return {'success': False, 'message': 'Motors are already disabled'}
 
-@app.get("/read/")
-def readIR():
-    return GPIO.input(IR_LED)
-
 
 # read pin 14 and return its value
 @app.get("/read/all")
@@ -229,6 +247,9 @@ def read():
         'realVelocity': realvelocity_value,
         'totalBoxesCount': totalBoxesCount,
         'periodBetweenBoxes': periodBetweenBoxes,
+        'voltage': get_voltage(),
+        'current': get_current(),
+        'power': get_power()*1000,
         'timestamp': (int)(time.time())
     }
 
@@ -238,3 +259,7 @@ def read():
 @app.get("/velocity")
 def get_velocity():
     return {"velocity": realvelocity_value, 'velocitymms': realvelocity_value * 1000}
+
+@app.get("/vitals")
+def get_vitals():
+    return {"voltage": get_voltage(), "current": get_current(), "power": get_power()/1000}
