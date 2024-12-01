@@ -29,7 +29,7 @@ This project is the implementation of the **Bobst Company challenge** presented 
 - AI-powered chatbot for troubleshooting and monitoring via **Ollama's Llama 3.2**.  
 - Interactive HMI built in **Unity** for real-time control and visualization.  
 - Dockerized architecture for easy deployment.
-- Bridge between Unity and Ollama with FastAPI
+- Bridge between Unity and Ollama with FastAPI.
 
 
 ---
@@ -40,9 +40,8 @@ This project is the implementation of the **Bobst Company challenge** presented 
 |----------------------|-------------------|-----------------------------------------------|
 | **Hardware**         | Raspberry Pi      | Controls conveyor belt and collects metrics. |
 | **Modeling**         | Unity             | Creates a 3D visualization of the machine.   |
-| **API Layer**        | FastAPI           | Communication between Unity and AI.          |
-| **AI**               | Ollama (Llama 3.2)| Context-aware troubleshooting chatbot.       |
-| **IoT**              | Azure IoT Hub     | Centralized data collection and monitoring.  |
+| **API Layer**        | FastAPI           | Communication between AI and Unity and Unity to Raspberry Pi.  |
+| **AI**               | Ollama (Llama 3.2)| Context-aware troubleshooting LLM chatbot.   |
 | **Deployment**       | Docker            | Simplified deployment of all components.     |
 
 ---
