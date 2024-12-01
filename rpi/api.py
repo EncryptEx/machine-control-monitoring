@@ -6,8 +6,11 @@ import logging
 from fastapi import FastAPI
 import RPi.GPIO as GPIO
 from ina219 import INA219
+from starlette.background import BackgroundTasks
 
-WANTS_TO_SEND_TELEMETRY = True
+
+
+WANTS_TO_SEND_TELEMETRY = False
 
 app = FastAPI()
 
@@ -28,7 +31,8 @@ logger = logging.getLogger(__name__)
 app.title = "Machine Control Monitoring API"
 app.description = "API for controlling motors on a Raspberry Pi"
 app.version = "0.1.0"
-
+EQUIPMENT_ID = "lauzhack-pi2"
+DATASOURCE = "10.0.4.60:8000"
 
 # GPIO Setup
 servoPIN = 17
@@ -65,6 +69,14 @@ ina.configure(voltage_range=ina.RANGE_16V,
               bus_adc=ina.ADC_128SAMP,
               shunt_adc=ina.ADC_128SAMP)
 
+# execute once "i'm up!"
+@app.on_event("startup")
+async def startup_event():  
+    # send telemetry of performance
+    global WANTS_TO_SEND_TELEMETRY
+    if(WANTS_TO_SEND_TELEMETRY == True):
+        send_message_to_iot_hub(create_machine_event("startProducing", "BobMachine", 0, 0, 0, datetime.datetime.now(datetime.timezone.utc)))
+        
 
 def get_distance():
     """Calculate and return the distance measured by the ultrasonic sensor."""
@@ -99,18 +111,19 @@ def get_power():
     return ina.power()
 
 
+client = IoTHubDeviceClient.create_from_connection_string(CONNECTION_STRING)
+
 def send_telemetry():
-    global areMotorsEnabled, servoSpeed, theorical_velocity, periodBetweenBoxes, totalBoxesCount
+    global client, areMotorsEnabled, servoSpeed, theorical_velocity, periodBetweenBoxes, totalBoxesCount
     if(WANTS_TO_SEND_TELEMETRY == False): return
     # Create an instance of the IoTHubDeviceClient
-    client = IoTHubDeviceClient.create_from_connection_string(CONNECTION_STRING)
     total_working_energy = 0.0  # Simulate total energy consumption
 
     try:
         while True:
             # Simulate machine speed (1 to 5 boxes per 10 seconds)
             # machine_speed = random.randint(1, 5)
-                        
+            # 
             
             total_working_energy = get_power()* 1000 # W
             
@@ -119,8 +132,8 @@ def send_telemetry():
             telemetry_data = {
                 "telemetry": {
                     "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                    "datasource": "10.0.4.60:8000",
-                    "machineid": "lauzhack-pi2",
+                    "datasource": DATASOURCE,
+                    "machineid": EQUIPMENT_ID,
                     "machinespeed": theorical_velocity * 1000, # mms
                     "totaloutputunitcount": totalBoxesCount,
                     "totalworkingenergy": total_working_energy
@@ -149,6 +162,40 @@ def send_telemetry():
         # Ensure to close the client after sending
         client.shutdown()
 
+
+def create_machine_event(event_type, job_id, job_output_count, total_output_count, production_time, timestamp):
+    global EQUIPMENT_ID, DATASOURCE
+    return {
+        "timestamp": timestamp.isoformat(),
+        "equipmentId": EQUIPMENT_ID,
+        "datasource": DATASOURCE,
+        "type": event_type,
+        "jobId": job_id,
+        "jobOutputUnitCount": job_output_count,
+        "totalOutputUnitCount": total_output_count,
+        "totalProductionTime": production_time
+    }
+    
+def send_message_to_iot_hub(event_data):
+    global client
+    try:
+        # Convert the dictionary to a JSON string
+        json_data = json.dumps(event_data)
+
+        # Create a message with the JSON data
+        machine_event_message = Message(json_data)
+        machine_event_message.content_type = "application/json"
+        machine_event_message.content_encoding = "utf-8"
+        machine_event_message.custom_properties["messageType"] = "MachineEvent"
+
+        # Send the message
+        logging.info(f"Sending JSON message to IoT Hub...")
+        logging.info(f"Message content: {json_data}")
+        client.send_message(machine_event_message)
+        logging.info("Message sent successfully!")
+
+    except Exception as e:
+        logging.error(f"Failed to send message to IoT Hub: {e}")
 
 # Helper function to normalize values
 def normalize_to_duty_cycle(value: float) -> float:
