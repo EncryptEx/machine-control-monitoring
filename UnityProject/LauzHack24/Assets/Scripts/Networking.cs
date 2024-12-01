@@ -12,12 +12,13 @@ public enum Requests
     powerOff,
     changeVelocity,
     readall,
+    rearm
 }
 
 public static class Networking
 {
     public const string raspi_base = "http://10.0.4.60:8000";
-    public const string chat_base = "http://10.0.4.43:8000/chatbot";
+    public const string chat_base = "http://localhost:8000/chatbot";
 
     private static Dictionary<Requests, string> requestUrl = new Dictionary<Requests, string>()
     {
@@ -25,6 +26,7 @@ public static class Networking
         { Requests.powerOff, raspi_base + "/motors/disable" },
         { Requests.changeVelocity, raspi_base + "/motors/enable/" },
         { Requests.readall, raspi_base + "/read/all" },
+        { Requests.rearm, raspi_base + "/motors/rearm" }
     };
 
     private static readonly HttpClient client = new HttpClient();

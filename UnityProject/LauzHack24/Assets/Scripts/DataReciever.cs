@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class DataReciever : MonoBehaviour
@@ -15,6 +16,11 @@ public class DataReciever : MonoBehaviour
         public bool isServoRunning;
         public float normalizedServoSpeed;
         public float realServoDutyCycle;
+        public int errno;
+        public float voltage;
+        public float current;
+        public float power;
+        public float realVelocity;
     }
 
     public Data lastData;
