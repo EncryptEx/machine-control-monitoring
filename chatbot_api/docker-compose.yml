@@ -1,0 +1,25 @@
+services:  
+  ollama:
+    image: ollama/ollama
+    ports:
+      - 11434:11434
+    healthcheck:
+      test: ollama --version || exit 1
+    volumes:
+      - ollama:/root/.ollama
+      - ./ollama_entrypoint.sh:/ollama_entrypoint.sh
+    entrypoint: ["/usr/bin/bash", "/ollama_entrypoint.sh"]
+
+  api:
+    build: ./api
+    volumes: 
+      - ./api:/app
+    ports:
+      - 8000:8000
+    depends_on:
+      - ollama
+  
+
+volumes:
+  ollama:
+  ollama_entrypoint.sh:
