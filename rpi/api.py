@@ -7,25 +7,51 @@ from fastapi import FastAPI
 import RPi.GPIO as GPIO
 from ina219 import INA219
 from starlette.background import BackgroundTasks
-
-
-
-WANTS_TO_SEND_TELEMETRY = False
-
-app = FastAPI()
-
-
 from azure.iot.device import IoTHubDeviceClient, Message
-
 import os
 from dotenv import load_dotenv
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+WANTS_TO_SEND_TELEMETRY = True
+app = FastAPI()
+
+BOXES_FILE = 'boxes.txt'
+
+def read_total_boxes():
+    with open(BOXES_FILE, 'r') as file:
+        return int(file.read().strip())
+    
+
+def write_total_boxes(total_boxes):
+    try: 
+        with open(BOXES_FILE, 'w') as file:
+            file.write(str(total_boxes))
+        return total_boxes
+    except FileNotFoundError:
+        with open(BOXES_FILE, 'x') as file:
+            file.write(str(total_boxes))
+        return total_boxes
+
+
+def increment_total_boxes():
+    global totalBoxesCount, deltaBox
+    totalBoxesCount += 1
+    deltaBox += 1
+    write_total_boxes(totalBoxesCount)
+
+totalBoxesCount = read_total_boxes()
+
+@app.get("/total_boxes")
+def get_total_boxes():
+    return {"total_boxes": totalBoxesCount}
 
 load_dotenv()
 # Replace with your IoT Hub device connection string
 CONNECTION_STRING = os.getenv("CONNECTION_STRING")
 
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+
 
 # configure Swagger
 app.title = "Machine Control Monitoring API"
@@ -35,12 +61,15 @@ EQUIPMENT_ID = "lauzhack-pi2"
 DATASOURCE = "10.0.4.60:8000"
 
 # GPIO Setup
+deltaBox = 0
+timeProducting = 0
 servoPIN = 17
 IR_LED = 14
 DEBOUNCE_DELAY = 0.01
 TRIG_PIN = 23  # GPIO pin connected to the TRIG pin of the sensor
 ECHO_PIN = 24  # GPIO pin connected to the ECHO pin of the sensor
 KILLSWITCH_THRESHOLD_CM = 8
+MARGIN_KILLSWITCH_PREVENT_SECONDS = 3
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(TRIG_PIN, GPIO.OUT)
@@ -52,11 +81,12 @@ GPIO.setup(IR_LED, GPIO.IN)
 p = GPIO.PWM(servoPIN, 50)
 areMotorsEnabled = False
 servoSpeed = 0
-theorical_velocity = 0.0
+real_velocity = 0.0
 periodBetweenBoxes = 0.0
-totalBoxesCount = 0
+theorical_velocity = 0.0
+errno_glbl = 0
 
-
+start_motor_time = 0
 
 ina = INA219(shunt_ohms=0.1,
              max_expected_amps=0.6,
@@ -76,6 +106,19 @@ async def startup_event():
     if(WANTS_TO_SEND_TELEMETRY == True):
         send_message_to_iot_hub(create_machine_event("startProducing", "BobMachine", 0, 0, 0, datetime.datetime.now(datetime.timezone.utc)))
         
+        
+
+def throw_erno_glbl(errn):
+    global errno_glbl, timeProducting
+    if(errno_glbl != 0): return
+    errno_glbl = errn
+    if(timeProducting == 0): timeProducting = time.time()
+    old = timeProducting
+    deltaTime = time.time() - old
+    send_message_to_iot_hub(create_machine_event("stopProducing", "BobMachine", deltaBox, totalBoxesCount, deltaTime, datetime.datetime.now(datetime.timezone.utc)))
+    deltaBox = 0
+    disable_motors()
+    logger.error(f"[ERRNO] Error {errn} occured, motors disabled")
 
 def get_distance():
     """Calculate and return the distance measured by the ultrasonic sensor."""
@@ -104,16 +147,16 @@ def get_voltage():
     return ina.voltage()
 
 def get_current():
-    return ina.current()
+    return ina.current() / 1000.0
 
 def get_power():
-    return ina.power()
+    return ina.power() / 1000.0
 
 
 client = IoTHubDeviceClient.create_from_connection_string(CONNECTION_STRING)
 
 def send_telemetry():
-    global client, areMotorsEnabled, servoSpeed, theorical_velocity, periodBetweenBoxes, totalBoxesCount
+    global client, areMotorsEnabled, servoSpeed, real_velocity, periodBetweenBoxes, totalBoxesCount
     if(WANTS_TO_SEND_TELEMETRY == False): return
     # Create an instance of the IoTHubDeviceClient
     total_working_energy = 0.0  # Simulate total energy consumption
@@ -124,7 +167,7 @@ def send_telemetry():
             # machine_speed = random.randint(1, 5)
             # 
             
-            total_working_energy = get_power()* 1000 # W
+            total_working_energy = get_power() # W
             
 
             # Create telemetry data with the current UTC timestamp
@@ -133,7 +176,7 @@ def send_telemetry():
                     "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                     "datasource": DATASOURCE,
                     "machineid": EQUIPMENT_ID,
-                    "machinespeed": theorical_velocity * 1000, # mms
+                    "machinespeed": real_velocity * 1000, # mms
                     "totaloutputunitcount": totalBoxesCount,
                     "totalworkingenergy": total_working_energy
                 }
@@ -179,7 +222,8 @@ def send_message_to_iot_hub(event_data):
     global client
     try:
         # Convert the dictionary to a JSON string
-        json_data = json.dumps(event_data)
+        json_data = json.dumps([event_data])
+
 
         # Create a message with the JSON data
         machine_event_message = Message(json_data)
@@ -215,11 +259,13 @@ def normalize_to_duty_cycle(value: float) -> float:
 
 # @app.get("/read/ir")
 def compute_velocity():
-    global theorical_velocity, DEBOUNCE_DELAY, periodBetweenBoxes, totalBoxesCount
+    global real_velocity, DEBOUNCE_DELAY, periodBetweenBoxes, totalBoxesCount, errno_glbl, start_motor_time
     lastTime = time.time()
     sspeed = 0
     waiting_for_rise = True
     while True:
+        if(errno_glbl != 0): 
+            continue
         ir_state = GPIO.input(IR_LED)
         currentTime = time.time()
         delta = currentTime - lastTime
@@ -230,15 +276,15 @@ def compute_velocity():
                 # RAISING EDGE
                 #Count boxes
                 logger.debug("Box detected")
-                totalBoxesCount += 1
+                increment_total_boxes()
 
                 #Calc velocity
 
                 if lastTime != None:
                     periodBetweenBoxes = delta
-                    theorical_velocity = 0.073 / float(delta)
+                    real_velocity = 0.073 / float(delta)
                 else:
-                    theorical_velocity = -1
+                    real_velocity = -1
 
                 lastTime = currentTime
         # logger.debug(f"IR state: {ir_state}, waiting_for_rise: {waiting_for_rise}, delta: {delta}")
@@ -251,12 +297,19 @@ def compute_velocity():
         #v3 = 6
         #v4 = 4.5
         #v5 = 4.2
-        velRef = [0, 13, 9, 6, 4.5, 4.2]
+        velRef = [1000, 13, 9, 6, 4.5, 4.2]
 
-        if (sspeed > 0.001 and delta > 1.5*velRef[int(sspeed)]):
-            #too much time has passed, 
-            theorical_velocity = 0
-        if(sspeed == 0): theorical_velocity = 0
+        if (sspeed > 0.01 and areMotorsEnabled and delta > 1.6*velRef[int(sspeed)]):
+            #wait and see 
+            deltaSeconds = time.time() - start_motor_time
+            if(deltaSeconds < MARGIN_KILLSWITCH_PREVENT_SECONDS):
+                pass # false alarm
+            else:#too much time has passed, 
+                real_velocity = 0
+                throw_erno_glbl(2)
+        if(sspeed == 0): real_velocity = 0
+        
+    
 
 
 # Start the frequency computation in a separate thread
@@ -270,10 +323,11 @@ iot.start()
 
 
 def check_killswitch():
+    global errno_glbl
     while True:
         distance = get_distance()
         if distance < KILLSWITCH_THRESHOLD_CM:
-            disable_motors()
+            throw_erno_glbl(1)
             print("Killswitch activated! Motors disabled.")
         time.sleep(0.5)
 
@@ -283,14 +337,23 @@ killswitch_thread.daemon = True
 killswitch_thread.start()
 
 
-@app.get("/helloworld")
-def helloworld():
-    logger.debug("Handling root endpoint request")
-    return {"Hello": "World"}
-
 @app.get("/motors/enable/")
 def enable_motors_default():
+    """
+    Enable motors with a normalized speed value of 5. (Full forward)
+    """
     return enable_motors(5)
+
+@app.get("/motors/rearm")
+def rearm():
+    """
+    Rearm the machine, allowing motors to be enabled.
+    """
+    global errno_glbl
+    if(errno_glbl == 0): return {'success': False, 'message': 'Machine is already armed and ready'}
+    errno_glbl = 0
+    send_message_to_iot_hub(create_machine_event("startProducing", "BobMachine", 0, 0, 0, datetime.datetime.now(datetime.timezone.utc)))
+    return {'success': True, 'message': 'Machine rearmed'}
 
 @app.get("/motors/enable/{value}")
 def enable_motors(value: float):
@@ -300,10 +363,16 @@ def enable_motors(value: float):
     0: Stopped
     5: Full forward
     """
-    global p, areMotorsEnabled, servoSpeed
+    global p, areMotorsEnabled, servoSpeed, errno_glbl, start_motor_time, timeProducting
+    if(errno_glbl != 0): return {'success': False, 'message': f'Machine unarmed! Error {errno_glbl}. Send /motors/rearm to rearm.'}
     if value < -5 or value > 5:
         return {'success': False, 'message': 'Value must be between -5 and 5'}
-
+    if(timeProducting == 0): timeProducting = time.time()
+    old = timeProducting
+    deltaTime = time.time() - old
+    deltaBox = 0
+    send_message_to_iot_hub(create_machine_event("newJob", "BobMachine", 0, 0, deltaTime, datetime.datetime.now(datetime.timezone.utc)))
+    start_motor_time = time.time()
     servoSpeed = value
     duty_cycle = normalize_to_duty_cycle(value)
     if not areMotorsEnabled:
@@ -323,14 +392,17 @@ def disable_motors():
     """
     Disable motors and clean up GPIO.
     """
-    global p, areMotorsEnabled, servoSpeed
+    global p, areMotorsEnabled, servoSpeed, timeProducting
     if areMotorsEnabled:
         areMotorsEnabled = False
         p.stop()
         import atexit
         atexit.register(GPIO.cleanup)
         servoSpeed = 0
-
+        if(timeProducting == 0): timeProducting = time.time()
+        old = timeProducting
+        deltaTime = time.time() - old
+        send_message_to_iot_hub(create_machine_event("stopJob", "BobMachine", totalBoxesCount, totalBoxesCount, deltaTime, datetime.datetime.now(datetime.timezone.utc)))
         return {'success': True, 'message': 'Motors disabled'}
     else:
         return {'success': False, 'message': 'Motors are already disabled'}
@@ -339,21 +411,24 @@ def disable_motors():
 # read pin 14 and return its value
 @app.get("/read/all")
 def read():
+    """
+    Read the value of all pins and useful variables.
+    """
     # prepare the response of all the pins
     response = {
         'IR_LED': readNormalizedIR(),
         'isServoRunning': areMotorsEnabled,
         'normalizedServoSpeed': servoSpeed,
         'realServoDutyCycle': normalize_to_duty_cycle(servoSpeed),
-        'realVelocity': theorical_velocity,
+        'realVelocity': real_velocity,
+        'errno': errno_glbl,
         'totalBoxesCount': totalBoxesCount,
         'periodBetweenBoxes': periodBetweenBoxes,
         'absoluteServoVelocity': abs(servoSpeed),
         'isForward': "f" if servoSpeed > 0 else "b",
-        
         'voltage': get_voltage(),
         'current': get_current(),
-        'power': get_power()*1000,
+        'power': get_power(),
         'timestamp': (int)(time.time())
     }
 
@@ -362,8 +437,14 @@ def read():
 # compute frequency between 1 rising edge and 1 falling edge
 @app.get("/velocity")
 def get_velocity():
-    return {"velocity": theorical_velocity, 'velocitymms': theorical_velocity * 1000}
+    """
+    Get the velocity of the machine in m/s and mm/s respectively.
+    """
+    return {"velocity": real_velocity, 'velocitymms': real_velocity * 1000}
 
 @app.get("/vitals")
 def get_vitals():
-    return {"voltage": get_voltage(), "current": get_current(), "power": get_power()*1000}
+    """
+    Get the voltage, current, and power consumption of the machine
+    """
+    return {"voltage": get_voltage(), "current": get_current(), "power": get_power()}
