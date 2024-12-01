@@ -1,5 +1,8 @@
 import threading
 import time
+import json
+import datetime
+import time
 import logging
 from fastapi import FastAPI
 import RPi.GPIO as GPIO
@@ -7,6 +10,15 @@ import RPi.GPIO as GPIO
 
 app = FastAPI()
 
+
+from azure.iot.device import IoTHubDeviceClient, Message
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+# Replace with your IoT Hub device connection string
+CONNECTION_STRING = os.getenv("CONNECTION_STRING")
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -32,6 +44,57 @@ servoSpeed = 0
 realvelocity_value = 0.0
 periodBetweenBoxes = 0.0
 totalBoxesCount = 0
+
+
+def send_telemetry():
+    global areMotorsEnabled, servoSpeed, realvelocity_value, periodBetweenBoxes, totalBoxesCount
+
+    # Create an instance of the IoTHubDeviceClient
+    client = IoTHubDeviceClient.create_from_connection_string(CONNECTION_STRING)
+    total_working_energy = 0.0  # Simulate total energy consumption
+
+    try:
+        while True:
+            # Simulate machine speed (1 to 5 boxes per 10 seconds)
+            # machine_speed = random.randint(1, 5)
+                        
+            # TODO!!!
+            energy_used = 1 * 0.05  # Example: 0.05 kWh per box
+            total_working_energy += energy_used
+
+            # Create telemetry data with the current UTC timestamp
+            telemetry_data = {
+                "telemetry": {
+                    "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    "datasource": "10.0.4.60:8000",
+                    "machineid": "lauzhack-pi2",
+                    "machinespeed": realvelocity_value * 1000, # mms
+                    "totaloutputunitcount": totalBoxesCount,
+                    "totalworkingenergy": total_working_energy
+                }
+            }
+
+            # Convert the telemetry data to JSON format
+            telemetry_json = json.dumps(telemetry_data)
+
+            # Create an IoT Hub Message from the JSON telemetry data
+            message = Message(telemetry_json)
+            message.content_type = "application/json"
+            message.content_encoding = "utf-8"
+            message.custom_properties["messageType"] = "Telemetry"
+
+            # Send the message to Azure IoT Hub
+            print("Sending message: {}".format(telemetry_json))
+            client.send_message(message)
+            print("Message successfully sent!")
+
+            # Wait for 10 seconds before sending the next message
+            time.sleep(1)
+    except Exception as e:
+        print("Error sending message: {}".format(e))
+    finally:
+        # Ensure to close the client after sending
+        client.shutdown()
 
 
 # Helper function to normalize values
@@ -63,6 +126,7 @@ def compute_velocity():
             if waiting_for_rise and ir_state == 1:  # Rising edge detected
                 time.sleep(DEBOUNCE_DELAY)  # Wait for debounce delay
                 if GPIO.input(IR_LED) == 1:  # Verify signal stability
+                    totalBoxesCount += 1
                     if start is None:  # First rising edge
                         start = time.perf_counter()
                         waiting_for_rise = False  # Now wait for the falling edge
@@ -92,9 +156,9 @@ frequency_thread = threading.Thread(target=compute_velocity)
 frequency_thread.daemon = True
 frequency_thread.start()
 
-# iot = threading.Thread(target=send_telemetry)
-# iot.daemon = True
-# iot.start()
+iot = threading.Thread(target=send_telemetry)
+iot.daemon = True
+iot.start()
 
 @app.get("/helloworld")
 def helloworld():
