@@ -54,10 +54,12 @@ This project is the implementation of the **Bobst Company challenge** presented 
 - Introduce predictive maintenance using AI.
 - Expand HMI with detailed production analytics.
 
-<br><br>
+<br>
+
 ### Screenshots
 
 Conveyor belt machine:
+![IMG_20241201_052245](https://github.com/user-attachments/assets/67cafee9-7007-4c13-ad16-447935e2a4e8)
 
 
 API for talking to the Raspberry Pi 5:
