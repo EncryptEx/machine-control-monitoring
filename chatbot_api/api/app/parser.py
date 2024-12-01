@@ -22,6 +22,7 @@ def parse_response(response):
         print(number)
         return user_response, number, parameter
 
+
     return user_response, None, None
 
 def parse_info_sensors(data):
@@ -30,7 +31,7 @@ def parse_info_sensors(data):
             "Motor Status": f"{'Running' if data['isServoRunning'] else 'Not Running'}",
             "Velocity (m/s)": round(data['realVelocity'], 2),
             "Total number of boxes passed": data['totalBoxesCount'],
-            "Speed": round(data['absoluteServoVelocity'], 2),
+            "Speed (from 0 to 5)": round(data['absoluteServoVelocity'], 2),
             "Servo Direction": "f Forward" if data['isForward'] == 'f' else "b Backward",
             "Voltage (V)": round(data['voltage'], 2),
             "Current (mA)": round(data['current'], 2),
