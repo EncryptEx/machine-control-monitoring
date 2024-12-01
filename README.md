@@ -82,7 +82,8 @@ Meet **Bob**, our AI-powered assistant built on **Ollama's Llama 3.2**. Bob is i
 ### Screenshots
 
 Conveyor belt machine:
-![IMG_20241201_052245](https://github.com/user-attachments/assets/67cafee9-7007-4c13-ad16-447935e2a4e8)
+![IMG20241201111510](https://github.com/user-attachments/assets/a1c6302c-2a39-4ec9-8342-4851ba1c60b9)
+
 
 The machine operates with a safety feature that performs a secure stop to prevent accidents when a hand is detected near the belt:
 
