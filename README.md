@@ -1,4 +1,4 @@
-# LauzHack24
+# Machine Control & Monitoring with Unity and AI Chatbot
 
 <img src="https://lauzhack.com/images/logo.svg" alt="logo" width="500"/>
 
