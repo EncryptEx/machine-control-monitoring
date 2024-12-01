@@ -1,4 +1,4 @@
-![Captura_5](https://github.com/user-attachments/assets/f025299e-f220-42ec-90f9-e2c39bff1e5c)# Machine Control & Monitoring with Unity and AI Chatbot
+# Machine Control & Monitoring with Unity and AI Chatbot
 
 <img src="https://lauzhack.com/images/logo.svg" alt="logo" width="500"/>
 
@@ -94,6 +94,7 @@ https://github.com/user-attachments/assets/0fd7f19d-bdc7-44b0-82ea-ef1dd0de94f4
 
 Unity interface:
 ![Captura_5](https://github.com/user-attachments/assets/ef5957ea-d579-46e6-9464-a22fba821c0b)
+![aimage](https://github.com/user-attachments/assets/7947538a-e56b-42aa-b0e9-361fe7e13a50)
 
 
 API for talking to the Raspberry Pi 5:
