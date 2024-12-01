@@ -7,6 +7,7 @@ from fastapi import FastAPI
 import RPi.GPIO as GPIO
 from ina219 import INA219
 
+WANTS_TO_SEND_TELEMETRY = True
 
 app = FastAPI()
 
@@ -41,7 +42,8 @@ GPIO.setup(IR_LED, GPIO.IN)
 p = GPIO.PWM(servoPIN, 50)
 areMotorsEnabled = False
 servoSpeed = 0
-realvelocity_value = 0.0
+theorical_velocity = 0.0
+practicVelocity = 0.0
 periodBetweenBoxes = 0.0
 totalBoxesCount = 0
 
@@ -69,8 +71,8 @@ def get_power():
 
 
 def send_telemetry():
-    global areMotorsEnabled, servoSpeed, realvelocity_value, periodBetweenBoxes, totalBoxesCount
-
+    global areMotorsEnabled, servoSpeed, theorical_velocity, periodBetweenBoxes, totalBoxesCount
+    if(WANTS_TO_SEND_TELEMETRY == False): return
     # Create an instance of the IoTHubDeviceClient
     client = IoTHubDeviceClient.create_from_connection_string(CONNECTION_STRING)
     total_working_energy = 0.0  # Simulate total energy consumption
@@ -81,8 +83,8 @@ def send_telemetry():
             # machine_speed = random.randint(1, 5)
                         
             
-            energy_used = get_power() / 1000 # W
-            total_working_energy += energy_used
+            total_working_energy = get_power()* 1000 # W
+            
 
             # Create telemetry data with the current UTC timestamp
             telemetry_data = {
@@ -90,7 +92,7 @@ def send_telemetry():
                     "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                     "datasource": "10.0.4.60:8000",
                     "machineid": "lauzhack-pi2",
-                    "machinespeed": realvelocity_value * 1000, # mms
+                    "machinespeed": theorical_velocity * 1000, # mms
                     "totaloutputunitcount": totalBoxesCount,
                     "totalworkingenergy": total_working_energy
                 }
@@ -137,7 +139,7 @@ def normalize_to_duty_cycle(value: float) -> float:
     return duty_cycle
 
 def compute_velocity():
-    global realvelocity_value, DEBOUNCE_DELAY, periodBetweenBoxes, totalBoxesCount
+    global theorical_velocity, DEBOUNCE_DELAY, periodBetweenBoxes, totalBoxesCount
     while True:
         start, end = None, None
         waiting_for_rise = True  # Start by waiting for a rising edge
@@ -164,14 +166,31 @@ def compute_velocity():
         if start is not None and end is not None:
             duration = end - start
             if duration > 0:  # Ensure valid duration
-                realvelocity_value = 0.073 / duration  # m/s
+                theorical_velocity = 0.073 / duration  # m/s
                 periodBetweenBoxes = duration
             else:
-                realvelocity_value = -1    
+                theorical_velocity = -1    
         else:
-            realvelocity_value = -1    
+            theorical_velocity = -1    
     
-    
+def count_rising_edges(duration: int):
+    global practicVelocity
+    while(True):
+        count = 0
+        start_time = time.time()
+        # add "duration" seconds to the current time
+        end_time = start_time + duration
+        while time.time() < end_time:
+            if GPIO.input(IR_LED) == 1:
+                time.sleep(DEBOUNCE_DELAY)
+                if GPIO.input(IR_LED) == 1:
+                    count += 1
+                    while GPIO.input(IR_LED) == 1:
+                        time.sleep(DEBOUNCE_DELAY)
+        deltaTime = time.time() - start_time # = duration
+        practicVelocity = 1000* count * 0.073 / deltaTime
+        print(f"Rising edges counted in {duration} seconds: {count} resulted into a practical velocity of {practicVelocity} mm/s")
+        time.sleep(1)
 
 # Start the frequency computation in a separate thread
 frequency_thread = threading.Thread(target=compute_velocity)
@@ -181,6 +200,11 @@ frequency_thread.start()
 iot = threading.Thread(target=send_telemetry)
 iot.daemon = True
 iot.start()
+
+# Start the rising edge counting in a separate thread
+rising_edge_thread = threading.Thread(target=count_rising_edges, args=(5,))
+rising_edge_thread.daemon = True
+rising_edge_thread.start()
 
 @app.get("/helloworld")
 def helloworld():
@@ -244,9 +268,13 @@ def read():
         'isServoRunning': areMotorsEnabled,
         'normalizedServoSpeed': servoSpeed,
         'realServoDutyCycle': normalize_to_duty_cycle(servoSpeed),
-        'realVelocity': realvelocity_value,
+        'realVelocity': theorical_velocity,
+        'practicVelocity': practicVelocity,
         'totalBoxesCount': totalBoxesCount,
         'periodBetweenBoxes': periodBetweenBoxes,
+        'absoluteServoVelocity': abs(servoSpeed),
+        'isForward': "f" if servoSpeed > 0 else "b",
+        
         'voltage': get_voltage(),
         'current': get_current(),
         'power': get_power()*1000,
@@ -258,8 +286,8 @@ def read():
 # compute frequency between 1 rising edge and 1 falling edge
 @app.get("/velocity")
 def get_velocity():
-    return {"velocity": realvelocity_value, 'velocitymms': realvelocity_value * 1000}
+    return {"velocity": theorical_velocity, 'velocitymms': theorical_velocity * 1000}
 
 @app.get("/vitals")
 def get_vitals():
-    return {"voltage": get_voltage(), "current": get_current(), "power": get_power()/1000}
+    return {"voltage": get_voltage(), "current": get_current(), "power": get_power()*1000}
