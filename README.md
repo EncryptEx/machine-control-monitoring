@@ -2,7 +2,7 @@
 
 <img src="https://lauzhack.com/images/logo.svg" alt="logo" width="500"/>
 
-![Hackathon](https://lauzhack.com/) EPFL Lausanne, Switzerland<br>
+[Hackathon](https://lauzhack.com/) EPFL Lausanne, Switzerland<br>
 November 30 - December 1
 ---
 ## Authors
